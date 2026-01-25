@@ -1,0 +1,42 @@
+name: deploy-lambda
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "service/**"
+      - "ml/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      LAMBDA_NAME: ${{ secrets.LAMBDA_NAME }}
+      API_URL: ${{ secrets.API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Package lambda
+        run: |
+          cd service/inference_lambda
+          zip -r ../../lambda.zip .
+      - name: Update lambda code
+        if: env.LAMBDA_NAME != ''
+        run: aws lambda update-function-code --function-name "$LAMBDA_NAME" --zip-file fileb://lambda.zip
+      - name: Smoke test
+        if: env.API_URL != ''
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          api_url = os.getenv("API_URL")
+          data = json.dumps({"features": [1,2,3]}).encode("utf-8")
+          req = urllib.request.Request(f"{api_url}/predict", data=data, headers={"Content-Type":"application/json"}, method="POST")
+          with urllib.request.urlopen(req) as resp:
+              print(resp.status)
+              print(resp.read().decode("utf-8"))
+          PY

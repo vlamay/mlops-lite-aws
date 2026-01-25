@@ -1,0 +1,40 @@
+{
+  "StartAt": "ValidateData",
+  "States": {
+    "ValidateData": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "TrainModel"
+    },
+    "TrainModel": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "EvaluateModel"
+    },
+    "EvaluateModel": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.metrics.accuracy",
+          "NumericGreaterThanEquals": 0.8,
+          "Next": "PublishArtifacts"
+        }
+      ],
+      "Default": "FailTraining"
+    },
+    "PublishArtifacts": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "UpdateServing"
+    },
+    "UpdateServing": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "End": true
+    },
+    "FailTraining": {
+      "Type": "Fail",
+      "Cause": "Quality gate failed"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "min_accuracy": 0.8,
+  "max_drift_score": 0.3
+}

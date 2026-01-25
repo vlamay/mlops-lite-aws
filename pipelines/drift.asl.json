@@ -1,0 +1,29 @@
+{
+  "StartAt": "ComputeDrift",
+  "States": {
+    "ComputeDrift": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Next": "DriftDecision"
+    },
+    "DriftDecision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.drift_score",
+          "NumericGreaterThan": 0.3,
+          "Next": "TriggerRetrain"
+        }
+      ],
+      "Default": "NoDrift"
+    },
+    "TriggerRetrain": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution",
+      "End": true
+    },
+    "NoDrift": {
+      "Type": "Succeed"
+    }
+  }
+}

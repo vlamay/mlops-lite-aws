@@ -1,0 +1,14 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+**/.build/
+infra/terraform/terraform.tfvars
+
+# Python
+**/__pycache__/
+**/*.pyc
+
+# Packaging
+lambda.zip
