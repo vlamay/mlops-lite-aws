@@ -1,5 +1,5 @@
 output "region" {
-  value = var.region
+  value = trimspace(var.region)
 }
 
 output "api_invoke_url" {

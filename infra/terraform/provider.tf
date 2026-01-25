@@ -13,7 +13,7 @@ terraform {
 }
 
 provider "aws" {
-  region = var.region
+  region = trimspace(var.region)
 
   default_tags {
     tags = {
