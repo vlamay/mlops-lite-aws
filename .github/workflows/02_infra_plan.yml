@@ -3,24 +3,30 @@ name: infra-plan
 on:
   pull_request:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   plan:
     runs-on: ubuntu-latest
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
       TF_VAR_region: ${{ vars.TF_VAR_region }}
       TF_VAR_owner: ${{ vars.TF_VAR_owner }}
       TF_VAR_bucket_suffix: ${{ vars.TF_VAR_bucket_suffix }}
       TF_VAR_env: ${{ vars.TF_VAR_env }}
     steps:
       - uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::026544697610:role/mlops-lite-github-oidc-dev
+          aws-region: eu-central-1
       - uses: hashicorp/setup-terraform@v3
       - name: Terraform fmt
         run: terraform -chdir=infra/terraform fmt -check -recursive
       - name: Terraform init
-        run: terraform -chdir=infra/terraform init
+        run: terraform -chdir=infra/terraform init -upgrade
       - name: Terraform validate
         run: terraform -chdir=infra/terraform validate
       - name: Terraform plan
