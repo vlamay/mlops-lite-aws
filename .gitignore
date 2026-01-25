@@ -13,9 +13,18 @@ infra/terraform/terraform.tfvars
 # Packaging
 lambda.zip
 
+<<<<<<< HEAD
 # Local environment artifacts
 CLOUDSHELL_COMMANDS.md
 QUICK_START_AWS.md
 docs/AWS_CONNECTION.md
 ml/
 scripts/
+=======
+# Terraform provider lockfile must be tracked
+!infra/terraform/.terraform.lock.hcl
+
+# Optional: do not track terraform plan artifacts
+infra/terraform/tfplan
+infra/terraform/*.tfplan
+>>>>>>> 24633e6 (chore(terraform): track provider lockfile)
