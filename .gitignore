@@ -12,3 +12,10 @@ infra/terraform/terraform.tfvars
 
 # Packaging
 lambda.zip
+
+# Local environment artifacts
+CLOUDSHELL_COMMANDS.md
+QUICK_START_AWS.md
+docs/AWS_CONNECTION.md
+ml/
+scripts/
