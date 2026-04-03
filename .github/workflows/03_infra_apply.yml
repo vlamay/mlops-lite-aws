@@ -3,6 +3,8 @@ name: infra-apply
 on:
   push:
     branches: ["main"]
+    paths:
+      - "infra/terraform/**"
 
 permissions:
   id-token: write
@@ -11,6 +13,7 @@ permissions:
 jobs:
   apply:
     runs-on: ubuntu-latest
+    environment: production
     env:
       TF_VAR_region: ${{ vars.TF_VAR_region }}
       TF_VAR_owner: ${{ vars.TF_VAR_owner }}

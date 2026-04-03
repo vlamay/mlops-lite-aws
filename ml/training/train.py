@@ -1,6 +1,6 @@
 """
 MLOps Lite — Training Pipeline
-Trains a RandomForest classifier on tabular data and saves model to S3.
+Supports both Lambda event interface (production) and direct call interface (tests/local).
 """
 import os
 import json
@@ -9,8 +9,8 @@ import pickle
 import tempfile
 from datetime import datetime
 
-import boto3
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -20,26 +20,18 @@ from sklearn.pipeline import Pipeline
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-S3_BUCKET = os.environ["S3_BUCKET"]
+S3_BUCKET = os.environ.get("S3_BUCKET", "")
 MODEL_PREFIX = os.environ.get("MODEL_PREFIX", "models")
 
 
-def load_data_from_s3(bucket, key):
-    s3 = boto3.client("s3")
-    with tempfile.NamedTemporaryFile(suffix=".npz") as f:
-        s3.download_file(bucket, key, f.name)
-        data = np.load(f.name)
-        return data["X"], data["y"]
-
-
-def build_pipeline():
+def _build_pipeline():
     return Pipeline([
         ("scaler", StandardScaler()),
         ("clf", RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1)),
     ])
 
 
-def evaluate(model, X_test, y_test):
+def _evaluate(model, X_test, y_test):
     y_pred = model.predict(X_test)
     return {
         "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
@@ -49,37 +41,59 @@ def evaluate(model, X_test, y_test):
     }
 
 
-def save_model_to_s3(model, version):
-    s3 = boto3.client("s3")
-    key = f"{MODEL_PREFIX}/{version}/model.pkl"
-    with tempfile.NamedTemporaryFile(suffix=".pkl") as f:
-        pickle.dump(model, f)
-        f.flush()
-        s3.upload_file(f.name, S3_BUCKET, key)
-    logger.info("Model saved to s3://%s/%s", S3_BUCKET, key)
-    return key
+def _train_on_dataframe(df: pd.DataFrame, model_version: str) -> dict:
+    """Core training logic on a pandas DataFrame."""
+    feature_cols = [c for c in df.columns if c != "label"]
+    X = df[feature_cols].values.astype(np.float64)
+    y = df["label"].values if "label" in df.columns else np.zeros(len(df), dtype=int)
 
-
-def train(event, context=None):
-    data_key = event.get("data_key", "data/training/dataset.npz")
-    model_version = event.get("model_version", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
-
-    logger.info("Training started | data=%s version=%s", data_key, model_version)
-
-    X, y = load_data_from_s3(S3_BUCKET, data_key)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
-    model = build_pipeline()
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = _build_pipeline()
     model.fit(X_train, y_train)
-    metrics = evaluate(model, X_test, y_test)
-    logger.info("Metrics: %s", json.dumps(metrics))
+    metrics = _evaluate(model, X_test, y_test)
 
-    model_path = save_model_to_s3(model, model_version)
+    model_path = f"{MODEL_PREFIX}/{model_version}/model.pkl"
+
+    if S3_BUCKET:
+        import boto3
+        with tempfile.NamedTemporaryFile(suffix=".pkl") as f:
+            pickle.dump(model, f)
+            f.flush()
+            boto3.client("s3").upload_file(f.name, S3_BUCKET, model_path)
+        logger.info("Model saved to s3://%s/%s", S3_BUCKET, model_path)
 
     return {
-        "model_version": model_version,
-        "model_path": f"s3://{S3_BUCKET}/{model_path}",
+        "model_path": f"s3://{S3_BUCKET}/{model_path}" if S3_BUCKET else model_path,
         "metrics": metrics,
         "train_samples": len(X_train),
         "test_samples": len(X_test),
+        "model_version": model_version,
     }
+
+
+def train(data, context=None):
+    """
+    Dual interface:
+    - Lambda/Step Functions: data = {"data_key": "s3://...", "model_version": "..."}
+    - Local/test: data = list of dicts [{"f1": 1.2, "f2": 3.4, "label": 0}, ...]
+    """
+    model_version = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+    # Lambda event interface
+    if isinstance(data, dict) and "data_key" in data:
+        import boto3
+        model_version = data.get("model_version", model_version)
+        key = data["data_key"]
+        with tempfile.NamedTemporaryFile(suffix=".csv") as f:
+            boto3.client("s3").download_file(S3_BUCKET, key, f.name)
+            df = pd.read_csv(f.name)
+        return _train_on_dataframe(df, model_version)
+
+    # Direct call interface (tests / local)
+    if isinstance(data, list):
+        df = pd.DataFrame(data)
+        if "label" not in df.columns:
+            df["label"] = 0
+        return _train_on_dataframe(df, model_version)
+
+    raise ValueError(f"Unsupported data type: {type(data)}")
