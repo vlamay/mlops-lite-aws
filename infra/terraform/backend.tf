@@ -7,3 +7,9 @@ terraform {
     encrypt = true
   }
 }
+
+# DynamoDB table for state locking — prevents concurrent apply race conditions
+# Create with: aws dynamodb create-table --table-name mlops-lite-tfstate-lock \
+#   --attribute-definitions AttributeName=LockID,AttributeType=S \
+#   --key-schema AttributeName=LockID,KeyType=HASH \
+#   --billing-mode PAY_PER_REQUEST --region eu-central-1

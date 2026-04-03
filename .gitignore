@@ -1,20 +1,22 @@
-# Local / CloudShell / IDE artifacts
-CLOUDSHELL_COMMANDS.md
-QUICK_START_AWS.md
-AWS_CONNECTION.md
-ml/
-scripts/
-
-# Terraform
-**/.terraform/*
-**/.terraform.lock.hcl
-!infra/terraform/.terraform.lock.hcl
-
-# Local terraform artifacts
-infra/terraform/tfplan
-infra/terraform/*.tfplan
-infra/terraform/trust-policy.json
-terraform.auto.tfvars
-
-# Generated ASL
-*.asl.json
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfplan
+*.pem
+*.key
+*.p12
+.env
+*.env.*
+.env.local
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.log
+node_modules/
+.npm/
+.venv/
+venv/
